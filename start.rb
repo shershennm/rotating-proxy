@@ -98,16 +98,17 @@ module Service
       super
       self.class.fire_and_forget(executable,
         "--SocksPort #{port}",
-	"--ControlPort #{control_port}",
+        "--ControlPort #{control_port}",
         "--NewCircuitPeriod 15",
-	"--MaxCircuitDirtiness 15",
-	"--UseEntryGuards 0",
-	"--UseEntryGuardsAsDirGuards 0",
-	"--CircuitBuildTimeout 5",
-	"--ExitRelay 0",
-	"--RefuseUnknownExits 0",
-	"--ClientOnly 1",
-	"--AllowSingleHopCircuits 1",
+        "--MaxCircuitDirtiness 15",
+        "--UseEntryGuards 0",
+        "--UseEntryGuardsAsDirGuards 0",
+        "--CircuitBuildTimeout 5",
+        "--ExitRelay 0",
+        "--ExitNodes {us},{ca}",
+        "--RefuseUnknownExits 0",
+        "--ClientOnly 1",
+        "--AllowSingleHopCircuits 1",
         "--DataDirectory #{data_directory}",
         "--PidFile #{pid_file}",
         "--Log \"warn syslog\"",
@@ -140,7 +141,7 @@ module Service
         "socksProxyType=socks5",
         "diskCacheRoot=''",
         "disableLocalInterface=true",
-        "allowedClients=127.0.0.1",
+        "allowedClients=0.0.0.0/0",
         "localDocumentRoot=''",
         "disableConfiguration=true",
         "dnsUseGethostbyname='yes'",
@@ -195,7 +196,7 @@ module Service
     end
 
     def polipo_port
-      tor_port + 10000
+      (ENV['polipo_port'] || 9000) + id
     end
     alias_method :port, :polipo_port
 
@@ -209,56 +210,16 @@ module Service
       false
     end
   end
-
-  class Haproxy < Base
-    attr_reader :backends
-
-    def initialize(port = 5566)
-      @config_erb_path = "/usr/local/etc/haproxy.cfg.erb"
-      @config_path = "/usr/local/etc/haproxy.cfg"
-      @backends = []
-      super(port)
-    end
-
-    def start
-      super
-      compile_config
-      self.class.fire_and_forget(executable,
-        "-f #{@config_path}",
-        "| logger 2>&1")
-    end
-
-    def soft_reload
-      self.class.fire_and_forget(executable,
-        "-f #{@config_path}",
-        "-p #{pid_file}",
-        "-sf #{File.read(pid_file)}",
-        "| logger 2>&1")
-    end
-
-    def add_backend(backend)
-      @backends << {:name => 'tor', :addr => '127.0.0.1', :port => backend.port}
-    end
-
-    private
-    def compile_config
-      File.write(@config_path, ERB.new(File.read(@config_erb_path)).result(binding))
-    end
-  end
 end
 
-haproxy = Service::Haproxy.new
 proxies = []
 
 tor_instances = ENV['tors'] || 10
 tor_instances.to_i.times.each do |id|
   proxy = Service::Proxy.new(id)
-  haproxy.add_backend(proxy)
   proxy.start
   proxies << proxy
 end
-
-haproxy.start
 
 sleep 60
 
