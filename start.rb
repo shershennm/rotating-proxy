@@ -136,6 +136,7 @@ module Service
         File.delete(pid_file)
       end
       self.class.fire_and_forget(executable,
+        "proxyAddress=0.0.0.0",
         "proxyPort=#{port}",
         "socksParentProxy=127.0.0.1:#{tor_port}",
         "socksProxyType=socks5",
