@@ -196,7 +196,7 @@ module Service
     end
 
     def polipo_port
-      (ENV['polipo_port'] || 9000) + id
+      (ENV['polipo_port'] || 8000) + id
     end
     alias_method :port, :polipo_port
 
